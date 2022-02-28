@@ -1,4 +1,11 @@
+import torch
+from torch import nn
 from torch import Tensor
+from typing import Tuple
+
+from embeddings import BERTEmbeddings
+from xformer_encoder import XformerEncoder
+from prediction import BERTMLMHead, BERTNSPHead
 
 
 class BertModel(nn.Module):
@@ -19,7 +26,7 @@ class BertModel(nn.Module):
         num_hidden_layers: int = 12,
         num_attention_heads: int = 12,
         attention_probs_dropout_prob: int = 0.1,
-        position_embedding_type: str = 'absolute',
+        position_embedding_type: str = "absolute",
         intermediate_size: int = 3072,
         hidden_act: str = "gelu",
         mlm_head_act: str = "gelu",
@@ -63,7 +70,48 @@ class BertModel(nn.Module):
             initializer_range (`float`, *optional*, defaults to 0.02):
                 The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
         """
-        pass
+        super().__init__()
+        self.embeddings = BERTEmbeddings(
+            vocab_size,
+            hidden_size,
+            pad_token_id,
+            max_position_embeddings,
+            type_vocab_size,
+            layer_norm_eps,
+            hidden_dropout_prob,
+        )
+        self.encoder = XformerEncoder(
+            num_hidden_layers,
+            num_attention_heads,
+            hidden_size,
+            attention_probs_dropout_prob,
+            layer_norm_eps,
+            hidden_dropout_prob,
+            position_embedding_type,
+            intermediate_size,
+            hidden_act,
+        )
+        self.mlm_head = BERTMLMHead(
+            hidden_size, mlm_head_act, vocab_size, layer_norm_eps
+        )
+        self.nsp_head = BERTNSPHead(hidden_size, nsp_head_act, 2)
+        self.initializer_range = initializer_range
+
+    def _init_weights(self, module):
+        """Initialize the weights"""
+        if isinstance(module, nn.Linear):
+            # Slightly different from the TF version which uses truncated_normal for initialization
+            # cf https://github.com/pytorch/pytorch/pull/5617
+            module.weight.data.normal_(mean=0.0, std=self.initializer_range)
+            if module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, nn.Embedding):
+            module.weight.data.normal_(mean=0.0, std=self.initializer_range)
+            if module.padding_idx is not None:
+                module.weight.data[module.padding_idx].zero_()
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
 
     def forward(
         self,
@@ -71,11 +119,11 @@ class BertModel(nn.Module):
         attention_mask: Tensor = None,
         token_type_ids: Tensor = None,
         position_ids: Tensor = None,
-        mlm_labels: Tensor = None,      # if mlm_labels or nsp_labels: return loss of them
+        mlm_labels: Tensor = None,  # if mlm_labels or nsp_labels: return loss of them
         nsp_labels: Tensor = None,
-        output_attentions: bool = False,        # else: return (last_hid, attentions, hid_states)
+        output_attentions: bool = False,  # else: return (last_hid, attentions, hid_states)
         output_hidden_states: bool = False,
-    ) -> tuple(Tensor, Tensor, Tensor):
+    ) -> Tuple[Tensor, Tensor, Tensor]:
         """
         Args:
             input_ids (`torch.LongTensor` of shape `(batch_size, sequence_length)`):
@@ -107,6 +155,26 @@ class BertModel(nn.Module):
             output_hidden_states (`bool`, *optional*):
                 Whether or not to return the hidden states of all layers.
         """
-        pass
+        input_shape = input_ids.shape
+        batch_size, seq_length = input_shape
 
+        device = input_ids.device
 
+        if attention_mask is None:
+            attention_mask = torch.ones(((batch_size, seq_length)), device=device)
+
+        embedding_output = self.embeddings(input_ids, token_type_ids, position_ids,)
+        encoder_outputs = self.encoder(embedding_output, attention_mask,)
+        mlm_output = self.mlm_head(encoder_outputs,)
+        nsp_output = self.nsp_head(encoder_outputs)
+        return encoder_outputs, mlm_output, nsp_output
+
+if __name__ == "__main__":
+    torch.manual_seed(42)
+    torch.cuda.manual_seed(42)
+
+    input_ids = torch.randint(0, 30522, (10, 20))
+
+    bert = BertModel()
+    hidden_states, mlm_output, nsp_output = bert(input_ids)
+    print(hidden_states, mlm_output.shape, nsp_output.shape)

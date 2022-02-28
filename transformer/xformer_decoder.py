@@ -1,6 +1,6 @@
 from typing import Union
 from torch import Tensor
-
+from torch import nn
 
 class XformerDecoder(nn.Module):
     """
