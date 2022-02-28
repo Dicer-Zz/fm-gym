@@ -15,7 +15,21 @@ class MultiHeadAttention(nn.Module):
         position_embedding_type: str = "absolute",  # Supporting 'relative' is a bonus.
         is_cross_attention: bool = False,
     ) -> None:
+        """
+        Args:
+            num_attention_heads (`int`, *optional*, defaults to 12):
+                Number of attention heads for each attention layer in the Transformer encoder.
+            hidden_size (`int`, *optional*, defaults to 768):
+                Dimensionality of the encoder layers.
+            attention_probs_dropout_prob (`float`, *optional*, defaults to 0.1):
+                The dropout ratio for the attention probabilities.
+            position_embedding_type (`str`, *optional*, defaults to `"absolute"`):
+                Type of position embedding. Choose one of `"absolute"`, `"relative"`. For
+                positional embeddings use `"absolute"`. For more information on `"relative"`, please refer to
+                [Self-Attention with Relative Position Representations (Shaw et al.)](https://arxiv.org/abs/1803.02155).
+        """
         super().__init__()
+
         assert hidden_size % num_attention_heads == 0
         assert (
             position_embedding_type == "absolute"
@@ -43,6 +57,7 @@ class MultiHeadAttention(nn.Module):
         )
         x = x.view(new_x_shape)
         return x.permute(0, 2, 1, 3)
+        
 
     def forward(
         self,
@@ -52,7 +67,25 @@ class MultiHeadAttention(nn.Module):
         encoder_attention_mask: Tensor = None,
         output_attentions: bool = False,  # Return Tensor if not output_attentions else tuple(Tensor, Tensor)
     ):
-
+        """
+        Args:
+            hidden_states (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
+                Contextual representations.
+            attention_mask (`torch.FloatTensor` of shape `(batch_size, sequence_length, sequence_length)`, *optional*):
+                Mask to avoid performing attention on padding token & future token indices. Mask values selected in `[0, 1]`:
+                - 1 for tokens that are **not masked**,
+                - 0 for tokens that are **masked**.
+            encoder_hidden_states (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
+                Contextual representations of the encoding sequence.
+            encoder_attention_mask (`torch.FloatTensor` of shape `(batch_size, sequence_length, sequence_length)`, *optional*):
+                Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
+                - 1 for tokens that are **not masked**,
+                - 0 for tokens that are **masked**.
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers.
+        """
+        self.multi_head_attention_type = 'cross-attention' if encoder_hidden_states else 'self-attention'
+        pass
         self.multi_head_attention_type = (
             "cross-attention" if encoder_hidden_states else "self-attention"
         )
@@ -90,6 +123,7 @@ class MultiHeadAttention(nn.Module):
         # outputs = (context_layer, attention_probs) if output_attentions else (context_layer,)
 
         return context_layer
+    
 
 
 class SelfAttentionSublayer(nn.Module):
@@ -108,6 +142,23 @@ class SelfAttentionSublayer(nn.Module):
         hidden_dropout_prob: float = 0.1,
         position_embedding_type: str = "absolute",  # Supporting 'relative' is a bonus.
     ) -> None:
+        """
+        Args:
+            num_attention_heads (`int`, *optional*, defaults to 12):
+                Number of attention heads for each attention layer in the Transformer encoder.
+            hidden_size (`int`, *optional*, defaults to 768):
+                Dimensionality of the encoder layers.
+            attention_probs_dropout_prob (`float`, *optional*, defaults to 0.1):
+                The dropout ratio for the attention probabilities.
+            layer_norm_eps (`float`, *optional*, defaults to 1e-12):
+                The epsilon used by the layer normalization layers.
+            hidden_dropout_prob (`float`, *optional*, defaults to 0.1):
+                The dropout probability for all fully connected layers in the embeddings and encoder.
+            position_embedding_type (`str`, *optional*, defaults to `"absolute"`):
+                Type of position embedding. Choose one of `"absolute"`, `"relative"`. For
+                positional embeddings use `"absolute"`. For more information on `"relative"`, please refer to
+                [Self-Attention with Relative Position Representations (Shaw et al.)](https://arxiv.org/abs/1803.02155).
+        """
         super().__init__()
         assert (
             position_embedding_type == "absolute"
@@ -122,6 +173,7 @@ class SelfAttentionSublayer(nn.Module):
         self.linear = nn.Linear(hidden_size, hidden_size)
         self.LayerNorm = nn.LayerNorm(hidden_size, layer_norm_eps)
         self.dropout = nn.Dropout(hidden_dropout_prob)
+        
 
     def forward(
         self,
@@ -129,11 +181,24 @@ class SelfAttentionSublayer(nn.Module):
         attention_mask: Tensor = None,
         output_attentions: bool = False,  # Return Tensor if not output_attentions else tuple(Tensor, Tensor)
     ):
+        """
+        Args:
+            hidden_states (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
+                Contextual representations.
+            attention_mask (`torch.FloatTensor` of shape `(batch_size, sequence_length, sequence_length)`, *optional*):
+                Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
+                - 1 for tokens that are **not masked**,
+                - 0 for tokens that are **masked**.
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers.
+        """
+        pass
         outputs = self.atten(hidden_states, attention_mask, output_attentions)
         # print(f"selfAttetionOutputs: {outputs}")
         outputs = self.dropout(self.linear(outputs))
         outputs = self.LayerNorm(outputs + hidden_states)
         return outputs
+    
 
 
 class CrossAttentionSublayer(nn.Module):
@@ -152,7 +217,23 @@ class CrossAttentionSublayer(nn.Module):
         hidden_dropout_prob: float = 0.1,
         position_embedding_type: str = "absolute",  # Supporting 'relative' is a bonus.
     ) -> None:
-
+        """
+        Args:
+            num_attention_heads (`int`, *optional*, defaults to 12):
+                Number of attention heads for each attention layer in the Transformer encoder.
+            hidden_size (`int`, *optional*, defaults to 768):
+                Dimensionality of the encoder layers.
+            attention_probs_dropout_prob (`float`, *optional*, defaults to 0.1):
+                The dropout ratio for the attention probabilities.
+            layer_norm_eps (`float`, *optional*, defaults to 1e-12):
+                The epsilon used by the layer normalization layers.
+            hidden_dropout_prob (`float`, *optional*, defaults to 0.1):
+                The dropout probability for all fully connected layers in the embeddings and encoder.
+            position_embedding_type (`str`, *optional*, defaults to `"absolute"`):
+                Type of position embedding. Choose one of `"absolute"`, `"relative"`. For
+                positional embeddings use `"absolute"`. For more information on `"relative"`, please refer to
+                [Self-Attention with Relative Position Representations (Shaw et al.)](https://arxiv.org/abs/1803.02155).
+        """
         assert (
             position_embedding_type == "absolute"
             or position_embedding_type == "relative"
@@ -167,6 +248,23 @@ class CrossAttentionSublayer(nn.Module):
         encoder_attention_mask: Tensor = None,
         output_attentions: bool = False,  # Return Tensor if not output_attentions else tuple(Tensor, Tensor)
     ):
+        """
+        Args:
+            hidden_states (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
+                Contextual representations.
+            attention_mask (`torch.FloatTensor` of shape `(batch_size, sequence_length, sequence_length)`, *optional*):
+                Mask to avoid performing attention on padding token & future token indices. Mask values selected in `[0, 1]`:
+                - 1 for tokens that are **not masked**,
+                - 0 for tokens that are **masked**.
+            encoder_hidden_states (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
+                Contextual representations of the encoding sequence.
+            encoder_attention_mask (`torch.FloatTensor` of shape `(batch_size, sequence_length, sequence_length)`, *optional*):
+                Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
+                - 1 for tokens that are **not masked**,
+                - 0 for tokens that are **masked**.
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers.
+        """
         pass
 
 

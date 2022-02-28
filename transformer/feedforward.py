@@ -17,6 +17,19 @@ class FeedforwardSublayer(nn.Module):
         layer_norm_eps: float = 1e-12,
         hidden_dropout_prob: float = 0.1,
     ) -> None:
+        """
+        Args:
+            hidden_size (`int`, *optional*, defaults to 768):
+                Dimensionality of the encoder layers.
+            intermediate_size (`int`, *optional*, defaults to 3072):
+                Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
+            hidden_act (`str` or `Callable`, *optional*, defaults to `"gelu"`):
+                The non-linear activation function (function or string) in the encoder.
+            layer_norm_eps (`float`, *optional*, defaults to 1e-12):
+                The epsilon used by the layer normalization layers.
+            hidden_dropout_prob (`float`, *optional*, defaults to 0.1):
+                The dropout probability for all fully connected layers in the embeddings and encoder.
+        """
         super().__init__()
         self.act2fn = {
             "relu": nn.ReLU,
@@ -30,6 +43,11 @@ class FeedforwardSublayer(nn.Module):
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(self, hidden_states: Tensor) -> Tensor:
+        """
+        Args:
+            hidden_states (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
+                Contextual representations.
+        """
         # ! processing order
         residual = hidden_states
 
