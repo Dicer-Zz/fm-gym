@@ -104,11 +104,14 @@ class MultiHeadAttention(nn.Module):
 
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
 
-        # print(attention_scores.shape, attention_mask.shape)
-        # # why?
-        # if attention_mask is not None:
-        #     attention_scores = attention_scores + attention_mask
-
+        if attention_mask is not None:
+            # attentin_scores: [batch_size, num_attention_heads, seq_length, seq_length]
+            # attention_mask: [batch_size, seq_length]
+            # extended_attention_mask: [batch_size, 1, 1, seq_length]
+            extend_attention_mask = attention_mask[:, None, None, :]
+            extend_attention_mask = (1.0 - extend_attention_mask) * -10000.0
+            attention_scores = attention_scores + extend_attention_mask
+        
         # Normalize
         attention_probs = nn.functional.softmax(attention_scores, dim=-1)
         attention_probs = self.dropout(attention_probs)

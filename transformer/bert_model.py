@@ -7,6 +7,20 @@ from embeddings import BERTEmbeddings
 from xformer_encoder import XformerEncoder
 from prediction import BERTMLMHead, BERTNSPHead
 
+class BertPooler(nn.Module):
+    def __init__(self, hidden_size):
+        super().__init__()
+        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.activation = nn.Tanh()
+
+    def forward(self, hidden_states):
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+        # first_token_tensor = hidden_states[:, 0]
+        first_token_tensor = hidden_states
+        pooled_output = self.dense(first_token_tensor)
+        pooled_output = self.activation(pooled_output)
+        return pooled_output
 
 class BertModel(nn.Module):
     """
@@ -91,11 +105,15 @@ class BertModel(nn.Module):
             intermediate_size,
             hidden_act,
         )
-        self.mlm_head = BERTMLMHead(
-            hidden_size, mlm_head_act, vocab_size, layer_norm_eps
-        )
-        self.nsp_head = BERTNSPHead(hidden_size, nsp_head_act, 2)
+        self.pooler = BertPooler(hidden_size)
+        # self.mlm_head = BERTMLMHead(
+        #     hidden_size, mlm_head_act, vocab_size, layer_norm_eps
+        # )
+        # self.nsp_head = BERTNSPHead(hidden_size, nsp_head_act, 2)
         self.initializer_range = initializer_range
+        
+        # Initialize all weights
+        self.apply(self._init_weights)
 
     def _init_weights(self, module):
         """Initialize the weights"""
@@ -165,9 +183,30 @@ class BertModel(nn.Module):
 
         embedding_output = self.embeddings(input_ids, token_type_ids, position_ids,)
         encoder_outputs = self.encoder(embedding_output, attention_mask,)
-        mlm_output = self.mlm_head(encoder_outputs,)
-        nsp_output = self.nsp_head(encoder_outputs)
-        return encoder_outputs, mlm_output, nsp_output
+        # encoder_outputs: [batch_size, seq_length, hidden_size]
+        # mlm_output = self.mlm_head(encoder_outputs)
+        # nsp_output = self.nsp_head(encoder_outputs[:, 0, :])
+
+        # total_loss = None
+        # if mlm_labels is not None and nsp_labels is not None:
+        #     loss_fn = nn.CrossEntropyLoss()
+        #     # mlm_output: [batch_size, seq_length, vocab_size]
+        #     # mlm_labels: [batch_size, seq_length]
+        #     mlm_loss = loss_fn(mlm_output.view(-1, mlm_output.size(-1)), mlm_labels.view(-1))
+        #     # nsp_output: [batch_size, 2]
+        #     # nsp_labels: [batch_size]
+        #     nsp_loss = loss_fn(nsp_output.view(-1, nsp_output.size(-1)), nsp_labels.view(-1))
+        #     total_loss = mlm_loss + nsp_loss
+
+        # return encoder_outputs, mlm_output, nsp_output
+        return {
+            # "loss": total_loss,
+            # "mlm_output": mlm_output,
+            # "nsp_output": nsp_output,
+            # "mlm_loss": mlm_loss,
+            # "nsp_loss": nsp_loss,
+            "encoder_outputs": encoder_outputs,
+        }
 
 if __name__ == "__main__":
     torch.manual_seed(42)
@@ -176,5 +215,5 @@ if __name__ == "__main__":
     input_ids = torch.randint(0, 30522, (10, 20))
 
     bert = BertModel()
-    hidden_states, mlm_output, nsp_output = bert(input_ids)
-    print(hidden_states, mlm_output.shape, nsp_output.shape)
+    outputs = bert(input_ids)
+    print(outputs)

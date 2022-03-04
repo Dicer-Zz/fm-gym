@@ -13,7 +13,7 @@ torch.manual_seed(SEED)
 torch.cuda.manual_seed(SEED)
 
 # Step 2: Load BERT hyperparameters
-from transformers import AutoConfig, AutoTokenizer
+from transformers import AutoConfig, AutoTokenizer, BertForPreTraining
 
 model_name = "bert-base-uncased"
 config = AutoConfig.from_pretrained(model_name)   # 'bart-base'
@@ -26,9 +26,10 @@ our_bert = BertModel()
 
 # Step 4: Get the model output without dropout
 our_bert.eval()
-inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
-last_hidden_states, _, _ = our_bert(**inputs)
-print(last_hidden_states)
+inputs = tokenizer(["Hello, my little dog is cute", "Hello, my cat is cute"], return_tensors="pt", padding=True)
+outputs = our_bert(**inputs)
+# print(last_hidden_states)
+print(outputs["encoder_outputs"])
 
 # Step 1: Set the Random Seed in the program entry 
 # IMPORTANT! SEED must be the same as ours!
@@ -46,7 +47,8 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)  # 'bart-base'
 
 # Step 3: Get the model output without dropout
 model.eval()
-inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
+inputs = tokenizer(["Hello, my little dog is cute", "Hello, my cat is cute"], return_tensors="pt", padding=True)
 outputs = model(**inputs)
 last_hidden_states = outputs.last_hidden_state
 print(last_hidden_states)
+
